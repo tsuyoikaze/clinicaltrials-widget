@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Simple Map</title>
+    <meta name="viewport" content="initial-scale=1.0">
+    <meta charset="utf-8">
+    <style>
+      html, body {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+      }
+      #map {
+        height: 80%;
+      }
+      progress[value]::-webkit-progress-value {
+        background-image:
+           -webkit-linear-gradient(bottom left, transparent 33%, rgba(0, 0, 0, .1) 33%, rgba(0,0, 0, .1) 66%, transparent 66%),
+           -webkit-linear-gradient(rgba(255, 255, 255, .25), rgba(0, 0, 0, .25)),
+           -webkit-linear-gradient(left, #09c, #f44);
+        background-image:
+           -o-linear-gradient(bottom left, transparent 33%, rgba(0, 0, 0, .1) 33%, rgba(0,0, 0, .1) 66%, transparent 66%),
+           -o-linear-gradient(rgba(255, 255, 255, .25), rgba(0, 0, 0, .25)),
+           -o-linear-gradient(left, #09c, #f44);
+        background-image:
+           linear-gradient(to top right, transparent 33%, rgba(0, 0, 0, .1) 33%, rgba(0,0, 0, .1) 66%, transparent 66%),
+           linear-gradient(rgba(255, 255, 255, .25), rgba(0, 0, 0, .25)),
+           linear-gradient(to right, #09c, #f44);;
+      
+          border-radius: 2px; 
+          background-size: 35px 20px, 100% 100%, 100% 100%;
+      }
+
+      .legend {
+        border-radius: 5%;
+        background: rgba(255, 255, 255, 0.8);
+        line-height: 18px;
+        color: #555;
+        width: 40%;
+        padding-left: 5px;
+        padding-top: 5px;
+        padding-right: 5px;
+        padding-bottom: 5px;
+      }
+      .legend p {
+        color: #333;
+        text-align: center;
+      }
+      .legend span {
+        color: #888;
+      }
+      .legend i {
+        width: 18px;
+        height: 18px;
+        float: left;
+        margin-right: 8px;
+        opacity: 0.7;
+      }
+
+      .marker-cluster-xxs {
+        background-color: rgba(235, 255, 235, 0.6);
+        }
+      .marker-cluster-xxs div {
+        background-color: rgba(218, 255, 218, 0.6);
+        }
+
+      .marker-cluster-xs {
+        background-color: rgba(180, 255, 180, 0.6);
+        }
+      .marker-cluster-xs div {
+        background-color: rgba(140, 255, 140, 0.6);
+        }
+
+      .marker-cluster-small {
+        background-color: rgba(181, 226, 140, 0.6);
+        }
+      .marker-cluster-small div {
+        background-color: rgba(140, 230, 80, 0.6);
+        }
+
+      .marker-cluster-medium {
+        background-color: rgba(241, 211, 87, 0.6);
+        }
+      .marker-cluster-medium div {
+        background-color: rgba(110, 204, 57, 0.6);
+        }
+
+      .marker-cluster-large {
+        background-color: rgba(253, 156, 115, 0.6);
+        }
+      .marker-cluster-large div {
+        background-color: rgba(240, 194, 12, 0.6);
+        }
+
+      .marker-cluster-xl {
+        background-color: rgba(255, 120, 125, 0.6);
+        }
+      .marker-cluster-xl div {
+        background-color: rgba(255, 81, 90, 0.6);
+        }
+
+      .marker-cluster-xxl {
+        background-color: rgba(255, 70, 80, 0.6);
+        }
+      .marker-cluster-xxl div {
+        background-color: rgba(255, 55, 66, 0.6);
+        }
+    </style>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.0.1/dist/leaflet.css"/>
+    <script src="https://unpkg.com/leaflet@1.0.1/dist/leaflet.js"></script>
+    <script src="PruneCluster/dist/PruneCluster.js"></script>
+    <script src="markercluster/dist/leaflet.markercluster.js"></script>
+    <link rel="stylesheet" href="markercluster/dist/MarkerCluster.css"/>
+    <link rel="stylesheet" href="markercluster/dist/MarkerCluster.Default.css"/>
+    <script src="country.js"></script>
+  </head>
+  <body>
+    <h1 id="title">Data Visualization</h1>
+    <div id="searchArea">
+      <input id="searchText" name="searchText" onkeyup="textProcessor()" placeholder="What...">
+      <select id="searchPlace" name="searchPlace" onchange="placeHandler()"></select>
+      <select name="source" id="source" value="clinicaltrials" onchange="textHandler()">
+        <option value="clicaltrials">clinicaltrials.gov</option>
+        <option value="dbgap">dbGaP</option>
+      </select>
+      <span id="resultPlace">0 studies are displayed </span><progress id="progress"></progress>
+    </div>
+    <br>
+    <div id="map"></div>
+    <script src="http://code.jquery.com/jquery-3.1.1.min.js"   integrity="sha256-hVVnYaiADRTO2PzUGmuLJr8BLUSjGIZsDYGmIJLv2b8="   crossorigin="anonymous"></script>
+    <script src="elasticsearch.jquery.js"></script>
+    <script type="text/javascript">
+
+      function getParameterByName(name, url) {
+        if (!url) {
+          url = window.location.href;
+        }
+        name = name.replace(/[\[\]]/g, "\\$&");
+        var regex = new RegExp("[?&]" + name + "(=([^&#]*)|&|#|$)"),
+            results = regex.exec(url);
+        if (!results) return null;
+        if (!results[2]) return '';
+        return decodeURIComponent(results[2].replace(/\+/g, " "));
+      }
+      if (getParameterByName("mode") == "widget") {
+        var height = getParameterByName("height");
+        var width = getParameterByName("width");
+        title.remove();
+        document.body.style.width = width + "px";
+        document.body.style.height = height + "px";
+      }
+
+      var countries = document.getElementById('searchPlace');
+      for (i = 0; i < list_of_countries.length; i++) {
+        var node = document.createElement("option");
+        node.value = list_of_countries[i].lat + "," + list_of_countries[i].lng;
+        node.innerText = list_of_countries[i].name;
+        countries.appendChild(node);
+      }
+
+      // previous search str
+      var whatStr = "";
+      var whereStr = "";
+      var lastVal = "elasticsearch";
+      var overallWeight = 0;
+
+      var temp;
+
+      // initialize map
+      var leafletMap = L.map('map').setView([38.169114, -93.713378], 5);
+
+      L.tileLayer(/*'https://api.mapbox.com/styles/v1/mapbox/light-v9/tiles/256/{z}/{x}/{y}?access_token=pk.eyJ1IjoidHN1eW9pa2F6ZSIsImEiOiJjaXVhdHM3b2EwMDNvMnpwZ3BqamhzcWthIn0.RnL0jdyAcgLbbW2P02YWxg'*/'https://api.mapbox.com/styles/v1/mapbox/streets-v9/tiles/256/{z}/{x}/{y}?access_token=pk.eyJ1IjoidHN1eW9pa2F6ZSIsImEiOiJjaXVhdHM3b2EwMDNvMnpwZ3BqamhzcWthIn0.RnL0jdyAcgLbbW2P02YWxg', {attribution: 'Map data &copy; <a href="http://openstreetmap.org">OpenStreetMap</a> contributors, <a href="http://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>, Imagery © <a href="http://mapbox.com">Mapbox</a>',maxZoom: 18,}).addTo(leafletMap);
+
+      // initialize cluster
+      //var pruneCluster = new PruneClusterForLeaflet();
+      //leafletMap.addLayer(pruneCluster);
+      //pruneCluster.Cluster.Size = 90;
+
+      var markers = L.markerClusterGroup({
+        maxClusterRadius: 200,
+        iconCreateFunction: function (cluster) {
+          var markersInCluster = cluster.getAllChildMarkers();
+          var totalWeight = 0;
+          var i;
+          for (i = 0; i < markersInCluster.length; i++) {
+            if (markersInCluster[i].hasOwnProperty("weight")) {
+              totalWeight += markersInCluster[i].weight;
+            }
+          }
+          var initialSize = 10;
+          var c = ' marker-cluster-';
+          if (totalWeight / overallWeight < 0.001) {
+            c += 'xxs';
+          } else if (totalWeight / overallWeight < 0.01) {
+            c += 'xs';
+          } else if (totalWeight / overallWeight < 0.03) {
+            c += 'small';
+          } else if (totalWeight / overallWeight < 0.05) {
+            c += 'medium';
+          } else if (totalWeight / overallWeight < 0.08) {
+            c += 'large';
+          } else if (totalWeight / overallWeight < 0.1) {
+            c += 'xl';
+          } else {
+            c += 'xxl';
+          }
+
+          if (totalWeight <= 20) {
+            initialSize += Math.log(totalWeight) * 2;
+          }
+          else if (totalWeight <= 80) {
+            initialSize += 6 + Math.pow(Math.E, (1/(1-((totalWeight - 20)/8)))) * 10;
+          }
+          else if (totalWeight <= 500) {
+            initialSize += 28 + Math.pow(Math.E, (1/(1-((totalWeight - 80)/40)))) * 20;
+          }
+          else {
+            initialSize += 64 + Math.pow(Math.E, (1/(1-((totalWeight - 500)/300)))) * 30;
+          }
+
+          return new L.DivIcon({ html: '<div oncontextmenu="createNewWindow();" onmouseover="showEnrollment(this, ' + totalWeight + ')" onmouseleave="showCount(this, ' + i + ')"><span>' + i + '</span></div>', className: 'marker-cluster' + c, iconSize: new L.Point(40, 40) });
+  }
+      });
+
+      function createNewWindow() {
+        //window.open("http://glowingshadow.ml/achilles/", "_blank");
+        var element = document.createElement("a");
+        element.href = "http://glowingshadow.ml/achilles/";
+        element.target = "_blank";
+        element.click();
+      }
+
+      leafletMap.addLayer(markers);
+      progress.hidden = true;
+
+      var legend = L.control({position: 'bottomright'});
+
+      legend.onAdd = function (map) {
+
+        var div = L.DomUtil.create('div', 'info legend');
+
+        div.innerHTML +=
+          '<p>Legend</p>' + 
+          '<i style="background: rgba(218, 255, 218, 0.8)"></i>-0.1%<br>' +
+          '<i style="background: rgba(140, 255, 140, 0.8)"></i>0.1%-1%<br>' +
+          '<i style="background: rgba(140, 230, 80, 0.8)"></i>1%-3%<br>' +
+          '<i style="background: rgba(110, 204, 57, 0.8)"></i>3%-5%<br>' +
+          '<i style="background: rgba(240, 194, 12, 0.8)"></i>5%-8%<br>' +
+          '<i style="background: rgba(255, 81, 90, 0.8)"></i>8%-10%<br>' +
+          '<i style="background: rgba(255, 55, 66, 0.8)"></i>10%-<hr>' + 
+          '<span>  Percent represents the ratio of subjects in such location to the total subjects in this query. <br><br>' + 
+          '<span>  Number on circles: number of studies found in such location. </span><br><br>' + 
+          '<span>  Put mouse over circles to see participating subjects of all studies in such location. Right-click for detailed data.</span>';
+
+        return div;
+      };
+
+      legend.addTo(leafletMap);
+
+      // Functor to be ultilized for legend.onAdd
+      function onAddFunctor(weight) {
+        return function(map) {
+          var div = L.DomUtil.create('div', 'info legend');
+
+          div.innerHTML +=
+            '<p>Legend</p>' + 
+            '<span>Total number of subjects (person):</span><br>' + 
+            '<i style="background: rgba(218, 255, 218, 0.8)"></i>0-' + Math.floor(0.001 * weight) + '<br>' +
+            '<i style="background: rgba(140, 255, 140, 0.8)"></i>' + Math.floor(0.001 * weight) + '-' + Math.floor(0.01 * weight) + '<br>' +
+            '<i style="background: rgba(140, 230, 80, 0.8)"></i>' + Math.floor(0.01 * weight) + '-' + Math.floor(0.03 * weight) + '<br>' +
+            '<i style="background: rgba(110, 204, 57, 0.8)"></i>' + Math.floor(0.03 * weight) + '-' + Math.floor(0.05 * weight) + '<br>' +
+            '<i style="background: rgba(240, 194, 12, 0.8)"></i>' + Math.floor(0.05 * weight) + '-' + Math.floor(0.08 * weight) + '<br>' +
+            '<i style="background: rgba(255, 81, 90, 0.8)"></i>' + Math.floor(0.08 * weight) + '-' + Math.floor(0.1 * weight) + '<br>' +
+            '<i style="background: rgba(255, 55, 66, 0.8)"></i>' + Math.floor(0.1 * weight) + '-more<hr>' + 
+            '<span>  Number on circles: number of studies found in such location. </span><br><br>' + 
+            '<span>  Put mouse over circles to see participating subjects of all studies in such location. </span>';
+
+          return div;
+        }
+      }
+
+      // initialize elasticsearch
+      var esClient = new $.es.Client({
+        host: '54.153.67.141:9200'
+      });
+
+      function searchCount(text, callback) {
+        var data = {
+          query: {
+            wildcard: {
+              title: {
+                "value": "*" + text + "*", 
+                "boost": 2.0
+              }
+            }
+          },
+          size: 10
+        };
+
+        $.post('http://25.53.188.247:9200/_search?search_type=count', JSON.stringify(data), function(json, textStatus) {
+          callback(json);
+        });
+      }
+
+      function recursiveCall (callback, endcall, scroll_id, ind, dec) {
+        console.log("curl -XPOST http://52.53.188.247:9200/_search/scroll?scroll=2m -d '" + scroll_id + "'");
+        console.log(ind);
+        console.log(dec);
+        if (ind <= 0) {
+          endcall();
+          return;
+        }
+        $.ajax({
+          type: 'POST',
+          url: 'http://52.53.188.247:9200/_search/scroll?scroll=2m',
+          data: scroll_id,
+          dataType: 'json',
+          async: true
+        })
+        .done(function(data) {
+          callback(data, data.hits.hits.length);
+          recursiveCall(callback, endcall, data._scroll_id, ind - dec, dec);
+        });
+      }
+
+
+      totalResult = 0;
+
+      function searchAll(data, callback, endcall, beforecall) {
+
+        if (source.value == 'dbgap') {
+          beforecall();
+          $.post('http://52.53.188.247:9200/dbgap/_search?scroll=2m', JSON.stringify(data), function(json, textStatus) {
+            totalResult = json.hits.total;
+            callback(json, json.hits.total, json.hits.total);
+            endcall();
+          });
+          return;
+        }
+
+        beforecall();
+
+        $.post('http://52.53.188.247:9200/trials/_search?scroll=2m', JSON.stringify(data), function(json, textStatus) {
+          totalResult = json.hits.total;
+          if (json.hits.total > 4000) {
+              isShifted = true;
+              originalCoor.coor = leafletMap.getCenter();
+              originalCoor.zoom = leafletMap.getZoom();
+              leafletMap.setView([-36, -146]);
+              leafletMap.setZoom(15);
+            }
+          if (json.hits.hits.length == json.hits.total) {
+            callback(json, json.hits.total, json.hits.total);
+            endcall();
+          }
+          else {
+            callback(json, json.hits.hits.length, json.hits.total);
+            var scroll_id = json._scroll_id;
+            console.log(json.hits.total);
+            
+            recursiveCall(callback, endcall, scroll_id, json.hits.total - 2000, 2000);
+          }
+        });
+      }
+
+      markerArr = [];
+      textCallTime = 0;
+      isShifted = false;
+      originalCoor = {};
+
+      function textProcessor() {
+        var localCallTime = Date.now();
+        textCallTime = localCallTime;
+        console.log(textCallTime);
+        setTimeout(function(){
+          if (textCallTime == localCallTime) {
+            textHandler();
+          }
+        }, 500);
+        
+      }
+
+      function textHandler() {
+
+        if (whatStr == searchText.value && lastVal == source.value) {
+          return;
+        }
+
+        var dat = {
+          "query": {
+            "query_string": {
+              "fields": ["title", "summary"],
+              "query": searchText.value.replace(" ", "\\ "),
+              "default_operator" : "AND"
+            }
+          },
+          "_source": ["title", "summary", "lat", "lng", "url", "status", "enrollment"],
+          "size": 2000
+        };
+
+        var regex = new RegExp('("[a-zA-Z0-9- \/]*")\\s*(AND|OR)\\s*("[a-zA-Z0-9- \/]*")');
+        if (searchText.value.match(regex) != null && searchText.value.match(regex).length == 4) {
+          //var temp_result = searchText.value.match(regex);
+          //dat.query.match.title.query = temp_result[1] + ' ' + temp_result[3];
+          //dat.query.match.title.operator = temp_result[2];
+          dat.query.query_string.query = searchText.value.replace(/"([A-Za-z0-9- \/]*")/g, function(match, p1, offset, string){return p1.substring(0, p1.length - 1).replace(" ", "\\ ");});
+        }
+
+          markers.clearLayers();
+          markerArr = [];
+          overallWeight = 0;
+
+          resultPlace.innerHTML = 'searching studies...... ';
+          searchAll(dat, function(data, chunk) {
+            progress.max = data.hits.total;
+            for (i = 0; i < data.hits.hits.length; i++) {
+              if (data.hits.hits[i]._source.lat != undefined && data.hits.hits[i]._source.lng != undefined) {
+                var marker = new L.Marker([data.hits.hits[i]._source.lat, data.hits.hits[i]._source.lng]);
+                marker.weight = data.hits.hits[i]._source.enrollment < 5 ? 5 : data.hits.hits[i]._source.enrollment;
+                overallWeight += marker.weight;
+                marker.bindPopup('<a class="popup_title" target="_blank" href="' + data.hits.hits[i]._source.url + '"><h3>' + data.hits.hits[i]._source.title + ' [' + data.hits.hits[i]._source.status + ']' + '</h3></a><p class="popup_text">' + data.hits.hits[i]._source.summary + '</p>');
+                markers.addLayer(marker);
+                markerArr.push({
+                  title: data.hits.hits[i]._source.title,
+                  marker: marker
+                })
+              }
+              //else {
+              //  console.log(data.hits.hits[i]._source.url);
+              //}
+            }
+            progress.value += 2000;
+            
+          }, 
+          function(){
+            markers.refreshClusters();
+            resultPlace.innerHTML = totalResult + ' studies are displayed ';
+            progress.hidden = true;
+            leafletMap.removeControl(legend);
+            legend.onAdd = onAddFunctor(overallWeight);
+            legend.addTo(leafletMap);
+            if (isShifted) {
+              isShifted = false;
+              leafletMap.setView([originalCoor.coor.lat, originalCoor.coor.lng]);
+              leafletMap.setZoom(originalCoor.zoom);
+            }
+          }, 
+          function(){
+            resultPlace.innerHTML = 'searching studies...... ';
+            progress.value = 0;
+            progress.hidden = false;
+          });
+        //}
+
+        whatStr = searchText.value;
+      }
+
+      function placeHandler() {
+        leafletMap.panTo(new L.LatLng(searchPlace.value.split(",")[0], searchPlace.value.split(",")[1]));
+        leafletMap.setZoom(5);
+      }
+
+      function showEnrollment (e, total) {
+        e.getElementsByTagName("span")[0].innerHTML = total;
+      }
+
+      function showCount (e, total) {
+        e.getElementsByTagName("span")[0].innerHTML = total;
+      }
+      if (getParameterByName("def_query") != null) {
+        searchText.value = getParameterByName("def_query");
+        textHandler();
+      }
+    </script>
+  </body>
+</html>
