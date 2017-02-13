@@ -22,6 +22,9 @@ http://52.53.188.247/map.html?mode=<mode>&height=<height>&width=<width>&def_quer
 #### Searching
 
 By typing words in the query field and wait for a while, the website will automatically start querying clinical trials information from our database. 
+
 Then, a number of circles will appear with each labelling the number of studies inside such area. 
+
 Hovering on a circle will display the total number of study population inside such area. 
+
 Right-click on a circle will display more detailed information about the demographics. 
